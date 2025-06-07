@@ -40,6 +40,10 @@ class MyAccessBDD extends AccessBDD {
                 return $this->selectAllRevues();
             case "exemplaire" :
                 return $this->selectExemplairesRevue($champs);
+            case "commandedocument/livre" :
+                return $this->selectCommandesLivres();    
+            case "commandedocument/dvd" :
+                return $this->selectCommandesDvd();    
             case "genre" :
             case "public" :
             case "rayon" :
@@ -77,7 +81,6 @@ class MyAccessBDD extends AccessBDD {
  * @return int|null ID du document inséré ou null en cas d'erreur
  */
 private function insertDocument(?array $champs): ?int {
-    file_put_contents("log_insertDocument.txt", file_get_contents("php://input") . "\n", FILE_APPEND);
     if (empty($champs)) {
         return null;
     }
@@ -90,15 +93,13 @@ private function insertDocument(?array $champs): ?int {
     $requete = "INSERT INTO document (id, titre, idRayon, idPublic, idGenre, image) 
                 VALUES (:id, :titre, :idRayon, :idPublic, :idGenre, :image)";
 
-    file_put_contents("log_insertDocument.txt", "Exécution de la requête SQL : " . $requete . "\nDonnées utilisées : " . json_encode($champs) . "\n", FILE_APPEND);
     $result = $this->conn->updateBDD($requete, $champs);
-    file_put_contents("log_insertDocument.txt", "Résultat de l'insertion : " . ($result ? "SUCCÈS" : "ÉCHEC") . "\n", FILE_APPEND);
-
 
     return $result ? $champs['id'] : null; // Retourne l'ID inséré ou null si échec
 }
 
     
+
     /**
      * demande de modification (update)
      * @param string $table
@@ -108,14 +109,27 @@ private function insertDocument(?array $champs): ?int {
      * @override
      */	
     protected function traitementUpdate(string $table, ?string $id, ?array $champs) : ?int{
-        switch($table){
-            case "" :
-                // return $this->uneFonction(parametres);
-            default:                    
-                // cas général
-                return $this->updateOneTupleOneTable($table, $id, $champs);
-        }	
+
+        // Pour les updates par numéro (exemplaire)
+    if ($table === "exemplaire" && $id === "numero" && isset($champs["numero"])) {
+        return $this->updateExemplaireParNumero($champs);
+    }
+
+    // Cas général
+    return $this->updateOneTupleOneTable($table, $id, $champs);	
     }  
+    
+    private function updateExemplaireParNumero($champs) {
+    if (!isset($champs['idEtat']) || !isset($champs['numero'])) {
+        return false;
+    }
+
+    $requete = "UPDATE exemplaire SET idEtat = :idEtat WHERE numero = :numero";
+
+    return $this->conn->updateBDD($requete, $champs);
+}
+
+
     
     /**
      * demande de suppression (delete)
@@ -296,19 +310,56 @@ private function insertDocument(?array $champs): ?int {
      * @param array|null $champs 
      * @return array|null
      */
-    private function selectExemplairesRevue(?array $champs) : ?array{
-        if(empty($champs)){
-            return null;
-        }
-        if(!array_key_exists('id', $champs)){
-            return null;
-        }
-        $champNecessaire['id'] = $champs['id'];
-        $requete = "Select e.id, e.numero, e.dateAchat, e.photo, e.idEtat ";
-        $requete .= "from exemplaire e join document d on e.id=d.id ";
-        $requete .= "where e.id = :id ";
-        $requete .= "order by e.dateAchat DESC";
-        return $this->conn->queryBDD($requete, $champNecessaire);
-    }		    
+    private function selectExemplairesRevue(?array $champs) : ?array {
+    if (empty($champs)) {
+        return null;
+    }
+    
+    if (!array_key_exists('id', $champs)) {
+        return null;
+    }
+
+    $champNecessaire['id'] = $champs['id'];
+
+    $requete = "SELECT e.id, e.numero, e.dateAchat, e.photo, e.idEtat ";
+    $requete .= "FROM exemplaire e JOIN document d ON e.id = d.id ";
+    $requete .= "WHERE e.id = :id ";
+    $requete .= "ORDER BY e.dateAchat DESC";
+
+    // Exécution de la requête
+    $result = $this->conn->queryBDD($requete, $champNecessaire);
+
+    return $result;
+}
+
+    
+    /**
+ * Récupère uniquement les commandes qui concernent des livres
+ * @return array|null
+ */
+private function selectCommandesLivres() : ?array {
+    $requete = "SELECT cd.*
+                FROM commandedocument cd
+                JOIN livres_dvd ld ON cd.idLivreDvd = ld.id
+                JOIN livre l ON ld.id = l.id";
+    
+    return $this->conn->queryBDD($requete);
+}
+
+    /**
+ * Récupère uniquement les commandes qui concernent des livres
+ * @return array|null
+ */
+private function selectCommandesDvd() : ?array {
+    $requete = "SELECT cd.*
+                FROM commandedocument cd
+                JOIN livres_dvd ld ON cd.idLivreDvd = ld.id
+                JOIN dvd d ON ld.id = d.id";
+
+    
+    return $this->conn->queryBDD($requete);
+}
+
+    
     
 }
