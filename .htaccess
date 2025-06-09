@@ -1,4 +1,9 @@
 RewriteEngine on
+
+# Redirection vers une erreur 400
+RewriteCond %{REQUEST_URI} ^/?$  [NC]
+RewriteRule ^.*$ - [R=400,L]
+
 RewriteCond %{REQUEST_METHOD} =GET
 RewriteRule ^([a-zA-Z0-9_]+)$ src/index.php?table=$1 [B,L]
 RewriteCond %{REQUEST_METHOD} =GET
