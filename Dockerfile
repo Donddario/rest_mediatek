@@ -1,4 +1,4 @@
-# Utilise l'image officielle PHP avec Apache
+# Utilise l'image officielle PHP avec Apache.
 FROM php:8.2-apache
 
 # Active mod_rewrite pour les routes REST
